@@ -73,10 +73,13 @@ static void setOrientationLock(BOOL lock) {
 
     %new
     - (void)unlockOrientationTapped:(UITapGestureRecognizer *)gestureRecognizer {
-        bundleIdentifierForAppWithUnlockedOrientation = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication].bundleIdentifier;
-        setOrientationLock(NO);
-        [self resetOrientalState];      
-        isOrientationUnlockedByTweak = YES;
+        id frontMostApp = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication];
+        if (frontMostApp && [frontMostApp isKindOfClass:%c(SBApplication)]) {
+            bundleIdentifierForAppWithUnlockedOrientation = ((SBApplication*)frontMostApp).bundleIdentifier;
+            setOrientationLock(NO);
+            [self resetOrientalState];      
+            isOrientationUnlockedByTweak = YES;
+        }
     }
 
     %new
