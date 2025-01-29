@@ -2,6 +2,7 @@
 
 extern NSString const *kCAPackageTypeCAMLBundle;
 
+static NSString *bundleIdentifierForAppWithUnlockedOrientation = nil;
 static BOOL isOrientationUnlockedByTweak = NO;
 
 static BOOL isOrientationLocked() {
@@ -72,6 +73,7 @@ static void setOrientationLock(BOOL lock) {
 
     %new
     - (void)unlockOrientationTapped:(UITapGestureRecognizer *)gestureRecognizer {
+        bundleIdentifierForAppWithUnlockedOrientation = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication].bundleIdentifier;
         setOrientationLock(NO);
         [self resetOrientalState];      
         isOrientationUnlockedByTweak = YES;
@@ -105,7 +107,7 @@ static void setOrientationLock(BOOL lock) {
 
 %end
 
-int lastOrientation = 1;
+//int lastOrientation = 1;
 
 %hook SBTraitsEmbeddedDisplayPipelineManager 
 
@@ -125,15 +127,15 @@ int lastOrientation = 1;
             NSDictionary* userInfo = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:currentOrientation] forKey:@"orientation"];
             [[NSNotificationCenter defaultCenter] postNotificationName:@"showOrientalIndicatorView" object:self userInfo:userInfo];
         }
-        else {
-            if ((lastOrientation == 3 || lastOrientation == 4) && (currentOrientation == 1 || currentOrientation == 2) && isOrientationUnlockedByTweak) {
-                setOrientationLock(YES);
-            }
+        // else {
+        //     if ((lastOrientation == 3 || lastOrientation == 4) && (currentOrientation == 1 || currentOrientation == 2) && isOrientationUnlockedByTweak) {
+        //         setOrientationLock(YES);
+        //     }
 
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"resetOrientalState" object:self userInfo:nil];            
-        }
+        //     [[NSNotificationCenter defaultCenter] postNotificationName:@"resetOrientalState" object:self userInfo:nil];            
+        // }
 
-        lastOrientation = currentOrientation;
+        //lastOrientation = currentOrientation;
 	}
 
     %new
@@ -143,7 +145,7 @@ int lastOrientation = 1;
             return NO;
 
         SpringBoard *sb = (SpringBoard *)[UIApplication sharedApplication];
-        id topPresentedApp = [sb _accessibilityFrontMostApplication];
+        SBApplication *topPresentedApp = [sb _accessibilityFrontMostApplication];
         BOOL isDeviceLocked = [sb isLocked];
         UIDeviceOrientation appOrientation = [sb _frontMostAppOrientation];
 
@@ -155,9 +157,25 @@ int lastOrientation = 1;
             // ==> quit
             return NO;
         }
+
+        if ([topPresentedApp.bundleIdentifier isEqualToString:bundleIdentifierForAppWithUnlockedOrientation])
+            return NO;
         
-        SBApplicationInfo *appInfo = ((SBApplication *)topPresentedApp).info;
+        SBApplicationInfo *appInfo = topPresentedApp.info;        
         return ![appInfo hasHiddenTag] && [appInfo supportsInterfaceOrientation:orientation];
     }
+
+%end
+
+%hook SpringBoard
+
+    -(void)frontDisplayDidChange:(id)arg1 {
+        if (arg1 == nil || (isOrientationUnlockedByTweak && [arg1 isKindOfClass:%c(SBApplication)] && ![((SBApplication*)arg1).bundleIdentifier isEqualToString:bundleIdentifierForAppWithUnlockedOrientation])) {
+            bundleIdentifierForAppWithUnlockedOrientation = nil;
+            setOrientationLock(YES);
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"resetOrientalState" object:self userInfo:nil];            
+        }
+
+    }    
 
 %end
