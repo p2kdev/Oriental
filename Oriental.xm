@@ -173,6 +173,7 @@ static void setOrientationLock(BOOL lock) {
 %hook SpringBoard
 
     -(void)frontDisplayDidChange:(id)arg1 {
+        %orig;
         if (arg1 == nil || (isOrientationUnlockedByTweak && [arg1 isKindOfClass:%c(SBApplication)] && ![((SBApplication*)arg1).bundleIdentifier isEqualToString:bundleIdentifierForAppWithUnlockedOrientation])) {
             bundleIdentifierForAppWithUnlockedOrientation = nil;
             setOrientationLock(YES);
